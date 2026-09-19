@@ -34,6 +34,20 @@ export type WorkFilter =
   | 'Inventory'
   | 'HR';
 
+export type WorkActionType =
+  | 'Review'
+  | 'Approve'
+  | 'Reject'
+  | 'View'
+  | 'Pay'
+  | 'Reorder'
+  | 'Follow Up'
+  | 'Assign'
+  | 'Send Reminder'
+  | 'Confirm Dispatch'
+  | 'Mark Done'
+  | 'Investigate';
+
 export interface WorkItem {
   id: string;
   category: WorkCategory;
@@ -50,24 +64,14 @@ export interface WorkItem {
   urgency: WorkUrgency;
   status: string;
   requiredAction: string;
+  requiredPermission: string; // RBAC check: e.g. 'purchase.approve', 'finance.manage', 'inventory.view'
   aiPriorityRank?: number;
   aiUrgencyReason?: string;
   businessImpact?: string;
   primaryActionLabel: string;
-  primaryActionType:
-    | 'approve'
-    | 'send_reminder'
-    | 'create_purchase'
-    | 'confirm_dispatch'
-    | 'mark_done'
-    | 'investigate';
+  primaryActionType: WorkActionType;
   secondaryActionLabel?: string;
-  secondaryActionType?:
-    | 'view'
-    | 'reject'
-    | 'snooze'
-    | 'view_product'
-    | 'view_invoice';
+  secondaryActionType?: WorkActionType;
   completed?: boolean;
   metadata?: Record<string, any>;
 }
@@ -80,4 +84,27 @@ export interface WorkTodaySummary {
   categoryCounts: Record<WorkCategory, number>;
   greeting: string;
   headlineSummary: string;
+}
+
+export interface WorkItemActionRequest {
+  itemId: string;
+  actionType: WorkActionType;
+  note?: string;
+  assignedTo?: string;
+  paymentDetails?: {
+    method: string;
+    reference: string;
+    amount: number;
+  };
+  reorderQuantity?: number;
+}
+
+export interface WorkItemActionResponse {
+  success: boolean;
+  itemId: string;
+  actionExecuted: WorkActionType;
+  updatedStatus: string;
+  transactionRef?: string;
+  message: string;
+  auditLogId?: string;
 }

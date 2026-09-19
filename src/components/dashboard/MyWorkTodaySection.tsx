@@ -23,6 +23,11 @@ import {
   Phone,
   Mail,
   Zap,
+  Loader2,
+  AlertOctagon,
+  UserPlus,
+  CreditCard,
+  Eye,
 } from 'lucide-react';
 import {
   WorkItem,
@@ -30,8 +35,11 @@ import {
   WorkCategory,
   WorkUrgency,
   WorkPriority,
+  WorkActionType,
+  WorkTodaySummary,
 } from '../../types/workToday';
 import { workTodayService } from '../../services/workTodayService';
+import { useAuth } from '../../context/AuthContext';
 import { Badge } from '../common/Badge';
 
 interface MyWorkTodaySectionProps {
@@ -45,19 +53,45 @@ export const MyWorkTodaySection: React.FC<MyWorkTodaySectionProps> = ({
   onNavigate,
   onOpenQuickCreate,
 }) => {
+  const { user } = useAuth();
   const [items, setItems] = useState<WorkItem[]>([]);
-  const [summary, setSummary] = useState(workTodayService.getSummary());
+  const [summary, setSummary] = useState<WorkTodaySummary | null>(null);
   const [activeFilter, setActiveFilter] = useState<WorkFilter>('All');
   const [isAiPrioritized, setIsAiPrioritized] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedItemForDetails, setSelectedItemForDetails] = useState<WorkItem | null>(null);
+
+  // Interactive Action Modal State (for Assign, Pay, Reject, Review)
+  const [actionModal, setActionModal] = useState<{
+    item: WorkItem;
+    actionType: WorkActionType;
+    isOpen: boolean;
+    note: string;
+    assignee: string;
+    paymentAmount?: number;
+  } | null>(null);
+
   const [actionFeedback, setActionFeedback] = useState<{
     message: string;
     itemId?: string;
   } | null>(null);
 
-  const loadData = () => {
-    setItems(workTodayService.getFilteredItems(activeFilter, isAiPrioritized));
-    setSummary(workTodayService.getSummary());
+  const loadData = async () => {
+    setIsLoading(true);
+    setErrorMessage(null);
+    try {
+      const [sum, itms] = await Promise.all([
+        workTodayService.getSummary(user?.permissions),
+        workTodayService.getFilteredItems(activeFilter, isAiPrioritized, user?.permissions),
+      ]);
+      setSummary(sum);
+      setItems(itms);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Unable to fetch Action Center items. Please retry.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -66,65 +100,86 @@ export const MyWorkTodaySection: React.FC<MyWorkTodaySectionProps> = ({
       loadData();
     });
     return () => unsubscribe();
-  }, [activeFilter, isAiPrioritized]);
+  }, [activeFilter, isAiPrioritized, user?.role, user?.permissions]);
 
-  const handleAction = (item: WorkItem, e?: React.MouseEvent) => {
+  const handleAction = async (item: WorkItem, actionType: WorkActionType, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
 
-    switch (item.primaryActionType) {
-      case 'approve': {
-        workTodayService.completeItem(item.id);
-        setActionFeedback({
-          message: `✓ Approved ${item.title} (${item.referenceNumber || item.partyName || ''})`,
-          itemId: item.id,
-        });
-        break;
-      }
-      case 'send_reminder': {
-        workTodayService.completeItem(item.id);
-        setActionFeedback({
-          message: `✓ Payment reminder dispatched to ${item.partyName || 'client'}`,
-          itemId: item.id,
-        });
-        break;
-      }
-      case 'create_purchase': {
-        workTodayService.completeItem(item.id);
-        setActionFeedback({
-          message: `✓ Reorder purchase requisition initiated for ${item.title}`,
-          itemId: item.id,
-        });
-        break;
-      }
-      case 'confirm_dispatch': {
-        workTodayService.completeItem(item.id);
-        setActionFeedback({
-          message: `✓ Carrier dispatch confirmed for ${item.referenceNumber || item.title}`,
-          itemId: item.id,
-        });
-        break;
-      }
-      case 'mark_done': {
-        workTodayService.completeItem(item.id);
-        setActionFeedback({
-          message: `✓ Marked completed: ${item.title}`,
-          itemId: item.id,
-        });
-        break;
-      }
-      case 'investigate': {
-        onOpenAI(`Investigate ${item.title}: ${item.requiredAction}`);
-        break;
-      }
+    // Check if action requires input (e.g. Reject reason, Assignee selection, Pay confirmation)
+    if (actionType === 'Assign' || actionType === 'Reject' || actionType === 'Pay') {
+      setActionModal({
+        item,
+        actionType,
+        isOpen: true,
+        note: '',
+        assignee: 'Sandra Bullock',
+        paymentAmount: item.amount,
+      });
+      return;
     }
 
-    if (selectedItemForDetails?.id === item.id) {
-      setSelectedItemForDetails(null);
+    if (actionType === 'View') {
+      setSelectedItemForDetails(item);
+      return;
+    }
+
+    if (actionType === 'Review') {
+      setSelectedItemForDetails(item);
+      return;
+    }
+
+    if (actionType === 'Investigate') {
+      onOpenAI(`Investigate ${item.title}: ${item.requiredAction}`);
+      return;
+    }
+
+    // Direct execution for Approve, Reorder, Follow Up, Confirm Dispatch, Mark Done
+    try {
+      const res = await workTodayService.executeAction({
+        itemId: item.id,
+        actionType,
+      });
+
+      setActionFeedback({
+        message: `✓ ${res.message}`,
+        itemId: item.id,
+      });
+
+      if (selectedItemForDetails?.id === item.id) {
+        setSelectedItemForDetails(null);
+      }
+    } catch (e: any) {
+      alert(e.message || 'Action failed.');
     }
 
     setTimeout(() => {
       setActionFeedback((prev) => (prev?.itemId === item.id ? null : prev));
     }, 4500);
+  };
+
+  const handleModalSubmit = async () => {
+    if (!actionModal) return;
+
+    try {
+      const res = await workTodayService.executeAction({
+        itemId: actionModal.item.id,
+        actionType: actionModal.actionType,
+        note: actionModal.note,
+        assignedTo: actionModal.assignee,
+      });
+
+      setActionFeedback({
+        message: `✓ ${res.message} ${actionModal.note ? `("${actionModal.note}")` : ''}`,
+        itemId: actionModal.item.id,
+      });
+
+      setActionModal(null);
+      if (selectedItemForDetails?.id === actionModal.item.id) {
+        setSelectedItemForDetails(null);
+      }
+    } catch (e: any) {
+      alert(e.message || 'Failed to submit action.');
+    }
   };
 
   const handleUndo = (itemId: string) => {
@@ -137,7 +192,7 @@ export const MyWorkTodaySection: React.FC<MyWorkTodaySectionProps> = ({
   };
 
   const FILTERS: { key: WorkFilter; label: string; count?: number }[] = [
-    { key: 'All', label: 'All', count: summary.totalCount },
+    { key: 'All', label: 'All', count: summary?.totalCount },
     { key: 'High Priority', label: 'High Priority' },
     { key: 'Today', label: 'Today' },
     { key: 'Overdue', label: 'Overdue' },
@@ -175,7 +230,7 @@ export const MyWorkTodaySection: React.FC<MyWorkTodaySectionProps> = ({
       case 'Critical':
         return <span className="flex h-2.5 w-2.5 rounded-full bg-rose-500 ring-4 ring-rose-100 dark:ring-rose-950 animate-pulse" title="Critical Urgency" />;
       case 'Important':
-        return <span className="flex h-2.5 w-2.5 rounded-full bg-amber-500 ring-4 ring-amber-100 dark:ring-amber-950" title="Important" />;
+        return <span className="flex h-2.5 w-2.5 rounded-full bg-amber-500 ring-4 ring-amber-100 dark:ring-amber-950" title="Important Priority" />;
       case 'Normal':
       default:
         return <span className="flex h-2.5 w-2.5 rounded-full bg-blue-500 ring-4 ring-blue-100 dark:ring-blue-950" title="Normal Priority" />;
@@ -219,31 +274,37 @@ export const MyWorkTodaySection: React.FC<MyWorkTodaySectionProps> = ({
                 <Sparkles className="h-4 w-4" />
               </span>
               <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                My Work Today
+                My Work Today / Action Center
               </h2>
-              <span className="ml-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-bold text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                {summary.totalCount} Pending
-              </span>
+              {summary && (
+                <span className="ml-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-bold text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                  {summary.totalCount} Pending
+                </span>
+              )}
             </div>
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              Cross-modular action items requiring executive attention today
+              Cross-modular action items filtered for your role: <span className="font-semibold text-slate-700 dark:text-slate-300">{user?.role}</span> ({user?.department})
             </p>
           </div>
 
           {/* Indicators Bar (Critical, Important, Normal) */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs">
-            <div className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50/70 px-2.5 py-1.5 font-bold text-rose-700 dark:border-rose-950 dark:bg-rose-950/40 dark:text-rose-300">
-              <span className="h-2 w-2 rounded-full bg-rose-600 animate-ping" />
-              <span>{summary.criticalCount} Critical</span>
-            </div>
-            <div className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50/70 px-2.5 py-1.5 font-bold text-amber-700 dark:border-amber-950 dark:bg-amber-950/40 dark:text-amber-300">
-              <span className="h-2 w-2 rounded-full bg-amber-500" />
-              <span>{summary.importantCount} Important</span>
-            </div>
-            <div className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50/70 px-2.5 py-1.5 font-bold text-blue-700 dark:border-blue-950 dark:bg-blue-950/40 dark:text-blue-300">
-              <span className="h-2 w-2 rounded-full bg-blue-500" />
-              <span>{summary.normalCount} Normal</span>
-            </div>
+            {summary && (
+              <>
+                <div className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50/70 px-2.5 py-1.5 font-bold text-rose-700 dark:border-rose-950 dark:bg-rose-950/40 dark:text-rose-300">
+                  <span className="h-2 w-2 rounded-full bg-rose-600 animate-ping" />
+                  <span>{summary.criticalCount} Critical</span>
+                </div>
+                <div className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50/70 px-2.5 py-1.5 font-bold text-amber-700 dark:border-amber-950 dark:bg-amber-950/40 dark:text-amber-300">
+                  <span className="h-2 w-2 rounded-full bg-amber-500" />
+                  <span>{summary.importantCount} Important</span>
+                </div>
+                <div className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50/70 px-2.5 py-1.5 font-bold text-blue-700 dark:border-blue-950 dark:bg-blue-950/40 dark:text-blue-300">
+                  <span className="h-2 w-2 rounded-full bg-blue-500" />
+                  <span>{summary.normalCount} Normal</span>
+                </div>
+              </>
+            )}
 
             {/* AI Assistant Quick Prompt */}
             <button
@@ -253,7 +314,7 @@ export const MyWorkTodaySection: React.FC<MyWorkTodaySectionProps> = ({
               title="Ask AI Copilot for morning action breakdown"
             >
               <Zap className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
-              <span>&ldquo;What should I take care of today?&rdquo;</span>
+              <span>&ldquo;What should I handle today?&rdquo;</span>
             </button>
           </div>
         </div>
@@ -262,19 +323,40 @@ export const MyWorkTodaySection: React.FC<MyWorkTodaySectionProps> = ({
         <div className="mt-4 rounded-xl border border-indigo-100 bg-linear-to-r from-indigo-50/70 via-white to-slate-50 p-4 dark:border-indigo-950/50 dark:from-indigo-950/20 dark:via-slate-900 dark:to-slate-900">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+              <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
                 <span className="font-bold text-indigo-700 dark:text-indigo-400">
-                  {summary.greeting}{' '}
+                  AI Morning Brief:{' '}
                 </span>
-                You have <span className="font-bold text-slate-900 dark:text-white">{summary.totalCount} items</span> requiring attention today:
+                {summary?.headlineSummary || 'Scanning ERP ledgers across all authorized modules...'}
               </p>
-              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600 dark:text-slate-300 font-medium">
-                <span>• {summary.categoryCounts['Pending Approvals']} high-priority approvals</span>
-                <span>• {summary.categoryCounts['Overdue Payments']} overdue invoices</span>
-                <span>• {summary.categoryCounts['Low Stock']} low-stock products</span>
-                <span>• {summary.categoryCounts['Employee Requests']} employee requests</span>
-                <span>• {summary.categoryCounts['Pending Purchases']} pending purchase order</span>
-              </div>
+              {summary && summary.totalCount > 0 && (
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-600 dark:text-slate-400 font-medium">
+                  {summary.categoryCounts['Pending Approvals'] > 0 && (
+                    <span>• {summary.categoryCounts['Pending Approvals']} approvals</span>
+                  )}
+                  {summary.categoryCounts['Overdue Payments'] > 0 && (
+                    <span>• {summary.categoryCounts['Overdue Payments']} overdue payments</span>
+                  )}
+                  {summary.categoryCounts['Low Stock'] > 0 && (
+                    <span>• {summary.categoryCounts['Low Stock']} low stock</span>
+                  )}
+                  {summary.categoryCounts['Pending Purchases'] > 0 && (
+                    <span>• {summary.categoryCounts['Pending Purchases']} pending POs</span>
+                  )}
+                  {summary.categoryCounts['Pending Sales Orders'] > 0 && (
+                    <span>• {summary.categoryCounts['Pending Sales Orders']} pending sales orders</span>
+                  )}
+                  {summary.categoryCounts['Employee Requests'] > 0 && (
+                    <span>• {summary.categoryCounts['Employee Requests']} employee requests</span>
+                  )}
+                  {summary.categoryCounts["Today's Tasks"] > 0 && (
+                    <span>• {summary.categoryCounts["Today's Tasks"]} tasks</span>
+                  )}
+                  {summary.categoryCounts['Important AI Alerts'] > 0 && (
+                    <span>• {summary.categoryCounts['Important AI Alerts']} AI alerts</span>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* [Show me what I should handle first] AI Action Button */}
@@ -326,159 +408,292 @@ export const MyWorkTodaySection: React.FC<MyWorkTodaySectionProps> = ({
           ))}
         </div>
 
-        {/* Work Items Grid / List */}
-        <div className="mt-4">
-          {items.length === 0 ? (
-            /* Empty State: You're all caught up 🎉 */
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-emerald-300 bg-emerald-50/40 p-8 text-center dark:border-emerald-900/60 dark:bg-emerald-950/20">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/60 dark:text-emerald-400 mb-3 shadow-inner">
-                <CheckCircle2 className="h-8 w-8" />
-              </div>
-              <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
-                You&apos;re all caught up 🎉
-              </h3>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-sm">
-                No items pending in the &ldquo;{activeFilter}&rdquo; queue. All approvals, payment reminders, and stock replenishments are up to date.
+        {/* Loading State */}
+        {isLoading && (
+          <div className="py-12 flex flex-col items-center justify-center text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-indigo-600 dark:text-indigo-400 mb-2" />
+            <p className="text-xs font-medium text-slate-500">
+              Querying authorized ERP ledgers and evaluating business urgency...
+            </p>
+          </div>
+        )}
+
+        {/* Error State */}
+        {!isLoading && errorMessage && (
+          <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50/60 p-4 dark:border-rose-950 dark:bg-rose-950/30 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertOctagon className="h-5 w-5 text-rose-600 shrink-0" />
+              <p className="text-xs text-rose-700 dark:text-rose-300 font-medium">
+                {errorMessage}
               </p>
-              <button
-                type="button"
-                onClick={() => workTodayService.resetAll()}
-                className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 shadow-2xs"
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                <span>Reset Demo Queue</span>
-              </button>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-              {items.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => setSelectedItemForDetails(item)}
-                  className="group relative flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-4 text-xs transition-all hover:border-indigo-400 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/90 dark:hover:border-indigo-600 cursor-pointer"
+            <button
+              type="button"
+              onClick={() => loadData()}
+              className="inline-flex items-center gap-1 rounded-lg bg-rose-600 px-3 py-1 text-xs font-bold text-white hover:bg-rose-700 shadow-2xs"
+            >
+              <RotateCcw className="h-3 w-3" />
+              <span>Retry</span>
+            </button>
+          </div>
+        )}
+
+        {/* Work Items Grid / List */}
+        {!isLoading && !errorMessage && (
+          <div className="mt-4">
+            {items.length === 0 ? (
+              /* Empty State: You’re all caught up. */
+              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-emerald-300 bg-emerald-50/40 p-8 text-center dark:border-emerald-900/60 dark:bg-emerald-950/20">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/60 dark:text-emerald-400 mb-3 shadow-inner">
+                  <CheckCircle2 className="h-8 w-8" />
+                </div>
+                <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                  You&apos;re all caught up.
+                </h3>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-sm">
+                  No items requiring attention in the &ldquo;{activeFilter}&rdquo; view for role <span className="font-semibold">{user?.role}</span>. All approvals, payment follow-ups, and replenishment queues are clear.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => workTodayService.resetAll()}
+                  className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 shadow-2xs"
                 >
-                  {/* Top Row: Category, Urgency Indicator, Module */}
-                  <div>
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <div className="flex items-center gap-1.5">
-                        {getUrgencyIcon(item.urgency)}
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                          {item.category}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {getModuleBadge(item.module)}
-                      </div>
-                    </div>
-
-                    {/* AI Priority Rank Badge (When AI Urgency Mode is active) */}
-                    {isAiPrioritized && item.aiPriorityRank && (
-                      <div className="mb-2 inline-flex items-center gap-1 rounded bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                        <Sparkles className="h-3 w-3 text-indigo-600 dark:text-indigo-400" />
-                        <span>AI Priority #{item.aiPriorityRank}</span>
-                      </div>
-                    )}
-
-                    {/* Title and Party / Subtitle */}
-                    <h4 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                      {item.title}
-                    </h4>
-
-                    {item.partyName && (
-                      <p className="mt-0.5 font-semibold text-slate-700 dark:text-slate-300">
-                        {item.partyName}
-                      </p>
-                    )}
-
-                    {/* Key Attributes: Amount / Stock / Reference / Date */}
-                    <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-2.5 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
-                      {item.amount !== undefined ? (
-                        <div>
-                          <span className="text-[10px] font-medium text-slate-400 uppercase">
-                            {item.category === 'Overdue Payments' ? 'Outstanding' : 'Amount'}
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  <span>Reset Action Center Queue</span>
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {items.map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => setSelectedItemForDetails(item)}
+                    className="group relative flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-4 text-xs transition-all hover:border-indigo-400 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/90 dark:hover:border-indigo-600 cursor-pointer"
+                  >
+                    {/* Top Row: Category, Urgency Indicator, Module */}
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-1.5">
+                          {getUrgencyIcon(item.urgency)}
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                            {item.category}
                           </span>
-                          <p className="text-xs font-extrabold text-slate-900 dark:text-white">
-                            ₹{item.amount.toLocaleString('en-IN')}
-                          </p>
                         </div>
-                      ) : item.currentStock !== undefined ? (
-                        <div>
-                          <span className="text-[10px] font-medium text-slate-400 uppercase">
-                            Current Stock
-                          </span>
-                          <p className="text-xs font-extrabold text-rose-600 dark:text-rose-400">
-                            {item.currentStock} units
-                          </p>
+                        <div className="flex items-center gap-1">
+                          {getModuleBadge(item.module)}
                         </div>
-                      ) : (
-                        <div>
-                          <span className="text-[10px] font-medium text-slate-400 uppercase">
-                            Reference
-                          </span>
-                          <p className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">
-                            {item.referenceNumber || 'N/A'}
-                          </p>
+                      </div>
+
+                      {/* AI Priority Rank Badge (When AI Urgency Mode is active) */}
+                      {isAiPrioritized && item.aiPriorityRank && (
+                        <div className="mb-2 inline-flex items-center gap-1 rounded bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                          <Sparkles className="h-3 w-3 text-indigo-600 dark:text-indigo-400" />
+                          <span>AI Urgency Priority #{item.aiPriorityRank}</span>
                         </div>
                       )}
 
-                      <div>
-                        <span className="text-[10px] font-medium text-slate-400 uppercase">
-                          {item.reorderLevel !== undefined ? 'Reorder Level' : 'Timeline'}
-                        </span>
-                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                          {item.reorderLevel !== undefined
-                            ? `${item.reorderLevel} units`
-                            : item.dueDateLabel}
+                      {/* Title and Party / Subtitle */}
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                        {item.title}
+                      </h4>
+
+                      {item.partyName && (
+                        <p className="mt-0.5 font-semibold text-slate-700 dark:text-slate-300">
+                          {item.partyName}
                         </p>
+                      )}
+
+                      {/* Key Attributes: Amount / Stock / Reference / Date */}
+                      <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-2.5 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
+                        {item.amount !== undefined ? (
+                          <div>
+                            <span className="text-[10px] font-medium text-slate-400 uppercase">
+                              {item.category === 'Overdue Payments' ? 'Outstanding' : 'Amount'}
+                            </span>
+                            <p className="text-xs font-extrabold text-slate-900 dark:text-white">
+                              ₹{item.amount.toLocaleString('en-IN')}
+                            </p>
+                          </div>
+                        ) : item.currentStock !== undefined ? (
+                          <div>
+                            <span className="text-[10px] font-medium text-slate-400 uppercase">
+                              Current Stock
+                            </span>
+                            <p className="text-xs font-extrabold text-rose-600 dark:text-rose-400">
+                              {item.currentStock} units
+                            </p>
+                          </div>
+                        ) : (
+                          <div>
+                            <span className="text-[10px] font-medium text-slate-400 uppercase">
+                              Reference
+                            </span>
+                            <p className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">
+                              {item.referenceNumber || 'N/A'}
+                            </p>
+                          </div>
+                        )}
+
+                        <div>
+                          <span className="text-[10px] font-medium text-slate-400 uppercase">
+                            {item.reorderLevel !== undefined ? 'Reorder Level' : 'Date / Timeline'}
+                          </span>
+                          <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                            {item.reorderLevel !== undefined
+                              ? `${item.reorderLevel} units`
+                              : item.dueDateLabel}
+                          </p>
+                        </div>
                       </div>
+
+                      {/* Required Action Description */}
+                      <div className="mt-2 text-[11px] text-slate-600 dark:text-slate-300 line-clamp-2">
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">
+                          Action required:{' '}
+                        </span>
+                        {item.requiredAction}
+                      </div>
+
+                      {/* AI Urgency Reason (Context) */}
+                      {isAiPrioritized && item.aiUrgencyReason && (
+                        <div className="mt-2 rounded bg-amber-50/80 p-1.5 text-[10px] font-medium text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200/60 dark:border-amber-900/40">
+                          ⚡ Why first: {item.aiUrgencyReason}
+                        </div>
+                      )}
                     </div>
 
-                    {/* Required Action Description */}
-                    <div className="mt-2 text-[11px] text-slate-600 dark:text-slate-300 line-clamp-2">
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">
-                        Action required:{' '}
-                      </span>
-                      {item.requiredAction}
+                    {/* Bottom Action Buttons (Touch friendly min 44px on mobile) */}
+                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2">
+                      {/* Secondary Action: Review / View / Reject / Assign */}
+                      {item.secondaryActionType && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleAction(item, item.secondaryActionType!, e)}
+                          className="flex-1 inline-flex items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 hover:border-indigo-300 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-colors min-h-[44px] sm:min-h-[38px]"
+                        >
+                          <span>{item.secondaryActionLabel || item.secondaryActionType}</span>
+                        </button>
+                      )}
+
+                      {/* Primary Action Button (Approve, Pay, Reorder, Follow Up, Assign, etc.) */}
+                      <button
+                        type="button"
+                        onClick={(e) => handleAction(item, item.primaryActionType, e)}
+                        className={`flex-1 inline-flex items-center justify-center gap-1 rounded-lg px-3 py-2 text-xs font-bold text-white shadow-xs transition-all min-h-[44px] sm:min-h-[38px] ${
+                          item.primaryActionType === 'Approve'
+                            ? 'bg-emerald-600 hover:bg-emerald-700'
+                            : item.primaryActionType === 'Pay'
+                            ? 'bg-blue-600 hover:bg-blue-700'
+                            : item.primaryActionType === 'Reorder'
+                            ? 'bg-amber-600 hover:bg-amber-700'
+                            : 'bg-indigo-600 hover:bg-indigo-700'
+                        }`}
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                        <span>{item.primaryActionLabel || item.primaryActionType}</span>
+                      </button>
                     </div>
-
-                    {/* AI Urgency Reason (Context) */}
-                    {isAiPrioritized && item.aiUrgencyReason && (
-                      <div className="mt-2 rounded bg-amber-50/80 p-1.5 text-[10px] font-medium text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200/60 dark:border-amber-900/40">
-                        ⚡ Why first: {item.aiUrgencyReason}
-                      </div>
-                    )}
                   </div>
-
-                  {/* Bottom Action Buttons (Touch friendly min 44px on mobile) */}
-                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2">
-                    {/* Secondary Action: View Details */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedItemForDetails(item);
-                      }}
-                      className="flex-1 inline-flex items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 hover:border-indigo-300 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-colors min-h-[44px] sm:min-h-[38px]"
-                    >
-                      <span>{item.secondaryActionLabel || 'View'}</span>
-                    </button>
-
-                    {/* Primary Action Button (Approve, Send Reminder, Create Purchase, etc.) */}
-                    <button
-                      type="button"
-                      onClick={(e) => handleAction(item, e)}
-                      className="flex-1 inline-flex items-center justify-center gap-1 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-indigo-700 transition-all min-h-[44px] sm:min-h-[38px]"
-                    >
-                      <Check className="h-3.5 w-3.5" />
-                      <span>{item.primaryActionLabel}</span>
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Interactive Action Modal (for Reject, Assign, Pay, Review) */}
+      {actionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
+          <div
+            className="relative w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-indigo-600 dark:text-indigo-400">
+                  Action Execution
+                </span>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white mt-0.5">
+                  {actionModal.actionType}: {actionModal.item.title}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActionModal(null)}
+                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3 text-xs">
+              {actionModal.actionType === 'Assign' && (
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Assign Responsibility To
+                  </label>
+                  <select
+                    value={actionModal.assignee}
+                    onChange={(e) =>
+                      setActionModal((prev) => (prev ? { ...prev, assignee: e.target.value } : null))
+                    }
+                    className="w-full rounded-lg border border-slate-200 bg-white p-2.5 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  >
+                    <option value="Sandra Bullock (Finance Lead)">Sandra Bullock (Finance Lead)</option>
+                    <option value="David Vance (Procurement)">David Vance (Procurement)</option>
+                    <option value="Linda Chen (Warehouse Ops)">Linda Chen (Warehouse Ops)</option>
+                    <option value="Arun Verma (Accounts)">Arun Verma (Accounts)</option>
+                  </select>
+                </div>
+              )}
+
+              {actionModal.actionType === 'Pay' && (
+                <div className="rounded-lg bg-blue-50/70 p-3 border border-blue-200 dark:border-blue-950 dark:bg-blue-950/30">
+                  <div className="flex justify-between text-xs font-bold text-blue-950 dark:text-blue-200">
+                    <span>Payment Disbursal Amount:</span>
+                    <span>₹{actionModal.item.amount?.toLocaleString('en-IN')}</span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-blue-800 dark:text-blue-300">
+                    Requires dual-factor CFO authorization. Dispatches via RTGS/NEFT gateway.
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Audit Notes / Instructions {actionModal.actionType === 'Reject' && '(Required)'}
+                </label>
+                <textarea
+                  rows={3}
+                  value={actionModal.note}
+                  onChange={(e) =>
+                    setActionModal((prev) => (prev ? { ...prev, note: e.target.value } : null))
+                  }
+                  placeholder={`Add operational context for ${actionModal.actionType}...`}
+                  className="w-full rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                />
+              </div>
+            </div>
+
+            <div className="mt-5 flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setActionModal(null)}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 min-h-[44px]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleModalSubmit}
+                className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-bold text-white hover:bg-indigo-700 shadow-sm min-h-[44px]"
+              >
+                Confirm {actionModal.actionType}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Quick Item Details Modal (Mobile & Desktop Friendly) */}
       {selectedItemForDetails && (
@@ -548,7 +763,7 @@ export const MyWorkTodaySection: React.FC<MyWorkTodaySectionProps> = ({
                 </div>
                 <div>
                   <span className="text-[10px] uppercase font-bold text-slate-400">
-                    Date &amp; Timing
+                    Date &amp; Timeline
                   </span>
                   <p className="font-semibold text-slate-700 dark:text-slate-300 mt-0.5">
                     {selectedItemForDetails.dueDateLabel}
@@ -564,10 +779,10 @@ export const MyWorkTodaySection: React.FC<MyWorkTodaySectionProps> = ({
                 </div>
                 <div>
                   <span className="text-[10px] uppercase font-bold text-slate-400">
-                    Priority Level
+                    Permission Scope
                   </span>
-                  <p className="font-semibold text-slate-700 dark:text-slate-300 mt-0.5">
-                    {selectedItemForDetails.priority} Priority ({selectedItemForDetails.urgency})
+                  <p className="font-mono font-semibold text-indigo-600 dark:text-indigo-400 mt-0.5">
+                    {selectedItemForDetails.requiredPermission}
                   </p>
                 </div>
               </div>
@@ -633,20 +848,22 @@ export const MyWorkTodaySection: React.FC<MyWorkTodaySectionProps> = ({
               </button>
 
               <div className="w-full sm:w-auto sm:ml-auto flex items-center gap-2">
+                {selectedItemForDetails.secondaryActionType && (
+                  <button
+                    type="button"
+                    onClick={(e) => handleAction(selectedItemForDetails, selectedItemForDetails.secondaryActionType!, e)}
+                    className="flex-1 sm:flex-initial rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 min-h-[44px]"
+                  >
+                    {selectedItemForDetails.secondaryActionLabel || selectedItemForDetails.secondaryActionType}
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={() => setSelectedItemForDetails(null)}
-                  className="flex-1 sm:flex-initial rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 min-h-[44px]"
-                >
-                  Close
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleAction(selectedItemForDetails)}
+                  onClick={(e) => handleAction(selectedItemForDetails, selectedItemForDetails.primaryActionType, e)}
                   className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-indigo-700 shadow-sm min-h-[44px]"
                 >
                   <Check className="h-4 w-4" />
-                  <span>{selectedItemForDetails.primaryActionLabel}</span>
+                  <span>{selectedItemForDetails.primaryActionLabel || selectedItemForDetails.primaryActionType}</span>
                 </button>
               </div>
             </div>

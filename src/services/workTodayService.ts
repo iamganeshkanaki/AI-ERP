@@ -1,4 +1,13 @@
-import { WorkItem, WorkTodaySummary, WorkFilter } from '../types/workToday';
+import {
+  WorkItem,
+  WorkTodaySummary,
+  WorkFilter,
+  WorkActionType,
+  WorkItemActionRequest,
+  WorkItemActionResponse,
+} from '../types/workToday';
+import { apiRequest } from './apiClient';
+import { environment } from '../config/environment';
 
 const INITIAL_WORK_ITEMS: WorkItem[] = [
   // 1. Pending Approvals
@@ -6,7 +15,7 @@ const INITIAL_WORK_ITEMS: WorkItem[] = [
     id: 'work-app-101',
     category: 'Pending Approvals',
     module: 'Approvals',
-    title: 'Purchase Order',
+    title: 'Purchase Order Approval',
     partyName: 'ABC Traders & Supplies',
     referenceNumber: 'PO-2026-4401',
     amount: 125000,
@@ -15,14 +24,15 @@ const INITIAL_WORK_ITEMS: WorkItem[] = [
     priority: 'High',
     urgency: 'Critical',
     status: 'Pending Sign-Off',
-    requiredAction: 'Executive authorization required before 5:00 PM cutoff to ensure on-time delivery.',
+    requiredAction: 'Executive authorization required before 5:00 PM cutoff to secure production batch delivery.',
+    requiredPermission: 'purchase.approve',
     aiPriorityRank: 1,
-    aiUrgencyReason: 'Vendor requires 24h manufacturing slot confirmation. Prevents factory line pause.',
-    businessImpact: 'Crucial sensor components for October assembly cycle.',
+    aiUrgencyReason: 'Vendor requires 24h manufacturing slot confirmation. Prevents factory assembly line stoppage.',
+    businessImpact: 'Crucial sensor components for October robotics manufacturing cycle.',
     primaryActionLabel: 'Approve',
-    primaryActionType: 'approve',
-    secondaryActionLabel: 'View',
-    secondaryActionType: 'view',
+    primaryActionType: 'Approve',
+    secondaryActionLabel: 'Review',
+    secondaryActionType: 'Review',
     metadata: {
       items: '100x Industrial Sensor Module B3, 50x Precision Bearings',
       requester: 'David Vance (Procurement)',
@@ -33,7 +43,7 @@ const INITIAL_WORK_ITEMS: WorkItem[] = [
     id: 'work-app-102',
     category: 'Pending Approvals',
     module: 'Approvals',
-    title: 'R&D Field Expense Claim',
+    title: 'R&D Calibration Expense Claim',
     partyName: 'Priya Sharma (Senior R&D Lead)',
     referenceNumber: 'EXP-2026-088',
     amount: 42500,
@@ -42,14 +52,15 @@ const INITIAL_WORK_ITEMS: WorkItem[] = [
     priority: 'High',
     urgency: 'Important',
     status: 'Pending Review',
-    requiredAction: 'Verify attached fuel, flight, and hotel receipts for reimbursement approval.',
+    requiredAction: 'Verify attached fuel, flight, and hotel receipts for reimbursement sign-off.',
+    requiredPermission: 'finance.approve',
     aiPriorityRank: 6,
     aiUrgencyReason: 'All 6 tax invoices verified and match corporate travel limits.',
     businessImpact: 'Employee reimbursement cycle closes tomorrow.',
     primaryActionLabel: 'Approve',
-    primaryActionType: 'approve',
-    secondaryActionLabel: 'View',
-    secondaryActionType: 'view',
+    primaryActionType: 'Approve',
+    secondaryActionLabel: 'Reject',
+    secondaryActionType: 'Reject',
     metadata: {
       department: 'Engineering',
       category: 'Travel & Testing Calibrations',
@@ -72,13 +83,14 @@ const INITIAL_WORK_ITEMS: WorkItem[] = [
     urgency: 'Important',
     status: '12 Days Past Due',
     requiredAction: 'Contact accounts department and issue formal payment follow-up notice.',
+    requiredPermission: 'finance.view',
     aiPriorityRank: 2,
     aiUrgencyReason: 'Credit limit reached (₹25L). Outstanding aging is impacting weekly receivables quota.',
     businessImpact: 'Cash collection needed for end-of-month vendor payables.',
-    primaryActionLabel: 'Send Reminder',
-    primaryActionType: 'send_reminder',
-    secondaryActionLabel: 'View Invoice',
-    secondaryActionType: 'view_invoice',
+    primaryActionLabel: 'Follow Up',
+    primaryActionType: 'Follow Up',
+    secondaryActionLabel: 'View',
+    secondaryActionType: 'View',
     metadata: {
       contactPerson: 'Arun Verma / Finance Desk',
       phone: '+91 98200 12345',
@@ -98,48 +110,23 @@ const INITIAL_WORK_ITEMS: WorkItem[] = [
     priority: 'High',
     urgency: 'Critical',
     status: '34 Days Past Due',
-    requiredAction: 'Escalate to Accounts Director; place temporary credit hold on new dispatches.',
+    requiredAction: 'Review payment history, issue legal warning notice, or execute payment plan.',
+    requiredPermission: 'finance.manage',
     aiPriorityRank: 3,
-    aiUrgencyReason: 'Overdue exceeds 30-day corporate tolerance window. Risk score elevated.',
-    businessImpact: '₹2.4L outstanding balance at risk of aging into bad debt.',
-    primaryActionLabel: 'Send Reminder',
-    primaryActionType: 'send_reminder',
-    secondaryActionLabel: 'View Invoice',
-    secondaryActionType: 'view_invoice',
+    aiUrgencyReason: 'Overdue exceeds 30-day corporate tolerance window. High risk of bad debt aging.',
+    businessImpact: '₹2.4L outstanding balance at risk of default.',
+    primaryActionLabel: 'Pay',
+    primaryActionType: 'Pay',
+    secondaryActionLabel: 'Review',
+    secondaryActionType: 'Review',
     metadata: {
       contactPerson: 'Capt. Nair',
       email: 'nair@zenithmarine.com',
       totalOrders: 4,
     },
   },
-  {
-    id: 'work-inv-7680',
-    category: 'Overdue Payments',
-    module: 'Finance',
-    title: 'Overdue Milestone Invoice',
-    partyName: 'Orion Advanced Robotics',
-    referenceNumber: 'INV-7680',
-    amount: 135000,
-    date: '2026-08-28',
-    dueDateLabel: 'Due: 22 days ago',
-    priority: 'Medium',
-    urgency: 'Normal',
-    status: '22 Days Past Due',
-    requiredAction: 'Issue automated WhatsApp & Email notification to finance manager.',
-    aiPriorityRank: 8,
-    aiUrgencyReason: 'Client has historically settled within 25 days. Mild risk.',
-    businessImpact: 'Expected settlement this week if reminded today.',
-    primaryActionLabel: 'Send Reminder',
-    primaryActionType: 'send_reminder',
-    secondaryActionLabel: 'View Invoice',
-    secondaryActionType: 'view_invoice',
-    metadata: {
-      contactPerson: 'Rohan Deshmukh',
-      phone: '+91 98110 54321',
-    },
-  },
 
-  // 3. Low Stock
+  // 3. Low Stock Items
   {
     id: 'work-stock-01',
     category: 'Low Stock',
@@ -155,13 +142,14 @@ const INITIAL_WORK_ITEMS: WorkItem[] = [
     urgency: 'Important',
     status: 'Low Stock (12 / 25)',
     requiredAction: 'Create purchase requisition for 50 cartridges to prevent invoice printing delays.',
+    requiredPermission: 'inventory.view',
     aiPriorityRank: 4,
-    aiUrgencyReason: 'Warehouse dispatch shipping labels rely on this printer. Stockout disrupts dispatch operations.',
+    aiUrgencyReason: 'Warehouse dispatch shipping labels rely on this printer. Stockout disrupts shipping.',
     businessImpact: 'High operational impact on warehouse shipping label generation.',
-    primaryActionLabel: 'Create Purchase',
-    primaryActionType: 'create_purchase',
-    secondaryActionLabel: 'View Product',
-    secondaryActionType: 'view_product',
+    primaryActionLabel: 'Reorder',
+    primaryActionType: 'Reorder',
+    secondaryActionLabel: 'View',
+    secondaryActionType: 'View',
     metadata: {
       warehouse: 'Central Supply Depot',
       preferredSupplier: 'Alpha Stationers & Tech',
@@ -182,54 +170,28 @@ const INITIAL_WORK_ITEMS: WorkItem[] = [
     priority: 'High',
     urgency: 'Important',
     status: 'Critical Low (14 / 50)',
-    requiredAction: 'Approve or place restocking order with ABC Traders to maintain production SLA.',
+    requiredAction: 'Reorder 100 modules from ABC Traders to maintain robotics assembly buffer.',
+    requiredPermission: 'inventory.view',
     aiPriorityRank: 5,
     aiUrgencyReason: 'High consumption SKU. 8 units scheduled for SO-8922 fulfillment today.',
     businessImpact: 'Production bottleneck for robotics line.',
-    primaryActionLabel: 'Create Purchase',
-    primaryActionType: 'create_purchase',
-    secondaryActionLabel: 'View Product',
-    secondaryActionType: 'view_product',
+    primaryActionLabel: 'Reorder',
+    primaryActionType: 'Reorder',
+    secondaryActionLabel: 'Assign',
+    secondaryActionType: 'Assign',
     metadata: {
       warehouse: 'Main Central Hub',
       preferredSupplier: 'ABC Traders & Supplies',
       unitCost: 4500,
     },
   },
-  {
-    id: 'work-stock-03',
-    category: 'Low Stock',
-    module: 'Inventory',
-    title: 'Precision Titanium Bearing Set',
-    partyName: 'Mechanical Spares',
-    referenceNumber: 'SKU-MECH-882',
-    currentStock: 8,
-    reorderLevel: 25,
-    date: '2026-09-17',
-    dueDateLabel: 'Stockout in: 6 days',
-    priority: 'Medium',
-    urgency: 'Normal',
-    status: 'Low Stock (8 / 25)',
-    requiredAction: 'Reorder 40 sets from West Coast Depo partner.',
-    aiPriorityRank: 9,
-    aiUrgencyReason: 'Secondary supplier available within 48 hours delivery.',
-    businessImpact: 'Moderate maintenance inventory deficit.',
-    primaryActionLabel: 'Create Purchase',
-    primaryActionType: 'create_purchase',
-    secondaryActionLabel: 'View Product',
-    secondaryActionType: 'view_product',
-    metadata: {
-      warehouse: 'West Coast Depo',
-      unitCost: 8900,
-    },
-  },
 
-  // 4. Pending Purchases
+  // 4. Pending Purchase Orders
   {
     id: 'work-po-4402',
     category: 'Pending Purchases',
     module: 'Purchase',
-    title: 'Purchase Order Requisition',
+    title: 'Silicon Semiconductor Requisition',
     partyName: 'MicroChip Foundry Int',
     referenceNumber: 'PO-2026-4402',
     amount: 485000,
@@ -238,14 +200,15 @@ const INITIAL_WORK_ITEMS: WorkItem[] = [
     priority: 'High',
     urgency: 'Important',
     status: 'Awaiting Vendor Ack',
-    requiredAction: 'Follow up with vendor sales rep for delivery schedule confirmation.',
+    requiredAction: 'Follow up with vendor sales engineer for production delivery schedule.',
+    requiredPermission: 'purchase.view',
     aiPriorityRank: 7,
     aiUrgencyReason: 'Lead time is 11 business days. Delivery target Sept 28 depends on acknowledgement today.',
-    businessImpact: 'Crucial silicon semiconductor chips for Q4 production.',
-    primaryActionLabel: 'Send Reminder',
-    primaryActionType: 'send_reminder',
-    secondaryActionLabel: 'View',
-    secondaryActionType: 'view',
+    businessImpact: 'Silicon microcontrollers for Q4 smart grid line.',
+    primaryActionLabel: 'Follow Up',
+    primaryActionType: 'Follow Up',
+    secondaryActionLabel: 'Review',
+    secondaryActionType: 'Review',
     metadata: {
       contactPerson: 'Sales Team / MicroChip Foundry',
       expectedDate: '2026-09-28',
@@ -257,7 +220,7 @@ const INITIAL_WORK_ITEMS: WorkItem[] = [
     id: 'work-so-8922',
     category: 'Pending Sales Orders',
     module: 'Sales',
-    title: 'Sales Order Dispatch',
+    title: 'Commercial Solar Inverter Dispatch',
     partyName: 'Quantum Solar Systems Ltd',
     referenceNumber: 'SO-2026-8922',
     amount: 380000,
@@ -266,14 +229,15 @@ const INITIAL_WORK_ITEMS: WorkItem[] = [
     priority: 'High',
     urgency: 'Important',
     status: 'Ready for Dispatch',
-    requiredAction: 'Verify final packaging inspection and generate carrier dispatch manifest.',
-    aiPriorityRank: 10,
-    aiUrgencyReason: 'Client has remitted 50% advance. Delivery deadline committed for tomorrow.',
+    requiredAction: 'Review final packaging inspection, assign warehouse carrier, and confirm dispatch.',
+    requiredPermission: 'sales.view',
+    aiPriorityRank: 8,
+    aiUrgencyReason: 'Customer remitted 50% advance. Delivery deadline committed for tomorrow.',
     businessImpact: '₹3.8L gross revenue recognition upon carrier handover.',
     primaryActionLabel: 'Confirm Dispatch',
-    primaryActionType: 'confirm_dispatch',
-    secondaryActionLabel: 'View',
-    secondaryActionType: 'view',
+    primaryActionType: 'Confirm Dispatch',
+    secondaryActionLabel: 'Assign',
+    secondaryActionType: 'Assign',
     metadata: {
       itemsCount: 14,
       carrier: 'BlueDart Logistics Fleet',
@@ -286,21 +250,22 @@ const INITIAL_WORK_ITEMS: WorkItem[] = [
     category: 'Employee Requests',
     module: 'HR',
     title: 'Annual Vacation Leave (5 Days)',
-    partyName: 'Marcus Sterling (Logistics)',
+    partyName: 'Marcus Sterling (Logistics Supervisor)',
     referenceNumber: 'LV-2026-034',
     date: '2026-09-18',
     dueDateLabel: 'Dates: Sept 28 - Oct 02',
     priority: 'Medium',
     urgency: 'Normal',
     status: 'Pending Manager Approval',
-    requiredAction: 'Review handover plan with Linda Chen and approve shift cover schedule.',
-    aiPriorityRank: 11,
+    requiredAction: 'Review shift handover plan with Linda Chen and approve leave application.',
+    requiredPermission: 'hr.approve',
+    aiPriorityRank: 9,
     aiUrgencyReason: 'Shift handover already agreed with warehouse supervisor Linda Chen.',
-    businessImpact: 'Team planning and workforce capacity for next week.',
+    businessImpact: 'Warehouse floor supervision coverage next week.',
     primaryActionLabel: 'Approve',
-    primaryActionType: 'approve',
-    secondaryActionLabel: 'View',
-    secondaryActionType: 'view',
+    primaryActionType: 'Approve',
+    secondaryActionLabel: 'Reject',
+    secondaryActionType: 'Reject',
     metadata: {
       department: 'Operations & Logistics',
       leaveBalance: '14 Days remaining',
@@ -312,25 +277,55 @@ const INITIAL_WORK_ITEMS: WorkItem[] = [
     id: 'work-task-01',
     category: "Today's Tasks",
     module: 'Tasks',
-    title: 'GST GSTR-3B Monthly Return Pre-Audit',
-    partyName: 'Finance & Compliance Team',
+    title: 'GST GSTR-3B Monthly Tax Pre-Audit',
+    partyName: 'Finance & Taxation Compliance',
     referenceNumber: 'TASK-COMP-901',
     date: '2026-09-19',
     dueDateLabel: 'Due: Today 5:00 PM',
     priority: 'High',
     urgency: 'Critical',
     status: 'In Progress',
-    requiredAction: 'Review input tax credit reconciliations with senior accountant Sandra Bullock.',
-    aiPriorityRank: 12,
-    aiUrgencyReason: 'Statutory compliance deadline tonight avoids penalty interest on tax liabilities.',
+    requiredAction: 'Review input tax credit balance with senior accountant Sandra Bullock and assign final signoff.',
+    requiredPermission: 'finance.view',
+    aiPriorityRank: 10,
+    aiUrgencyReason: 'Statutory government compliance deadline tonight avoids penalty interest on tax liabilities.',
     businessImpact: 'Statutory government compliance deadline.',
-    primaryActionLabel: 'Mark Complete',
-    primaryActionType: 'mark_done',
-    secondaryActionLabel: 'View',
-    secondaryActionType: 'view',
+    primaryActionLabel: 'Mark Done',
+    primaryActionType: 'Mark Done',
+    secondaryActionLabel: 'Assign',
+    secondaryActionType: 'Assign',
     metadata: {
       assignee: 'Sandra Bullock',
       statutoryDate: '2026-09-20',
+    },
+  },
+
+  // 8. Important AI Alerts
+  {
+    id: 'work-ai-alert-01',
+    category: 'Important AI Alerts',
+    module: 'AI',
+    title: 'Raw Material Margin Anomaly',
+    partyName: 'Automated Procurement Watchdog',
+    referenceNumber: 'AI-WARN-702',
+    amount: 68000,
+    date: '2026-09-19',
+    dueDateLabel: 'Detected: 2 hours ago',
+    priority: 'High',
+    urgency: 'Important',
+    status: 'Anomaly Detected',
+    requiredAction: 'Investigate 8.4% steel cost increase and review impact on PO-4403 margins.',
+    requiredPermission: 'ai.use',
+    aiPriorityRank: 11,
+    aiUrgencyReason: 'Steel vendor quote increased while client contract SO-8910 price is fixed.',
+    businessImpact: 'Estimated margin erosion of ₹68,000 if not adjusted.',
+    primaryActionLabel: 'Investigate',
+    primaryActionType: 'Investigate',
+    secondaryActionLabel: 'Review',
+    secondaryActionType: 'Review',
+    metadata: {
+      affectedSKU: 'Raw Stainless 316 Rods',
+      variancePercent: '+8.4%',
     },
   },
 ];
@@ -350,12 +345,38 @@ class WorkTodayService {
     this.listeners.forEach((listener) => listener());
   }
 
-  public getItems(): WorkItem[] {
-    return [...this.items];
+  /**
+   * Filter items according to the logged-in user's role and granular permissions.
+   * Prevents leaking confidential records to unauthorized roles.
+   */
+  private filterAuthorized(items: WorkItem[], userPermissions?: string[]): WorkItem[] {
+    if (!userPermissions || userPermissions.includes('*')) {
+      return items;
+    }
+    return items.filter((item) => {
+      // Check if user has the specific permission or wildcard module access
+      const [modulePrefix] = item.requiredPermission.split('.');
+      return (
+        userPermissions.includes(item.requiredPermission) ||
+        userPermissions.includes(`${modulePrefix}.*`) ||
+        userPermissions.includes(`${modulePrefix}.view`) ||
+        userPermissions.includes(`${modulePrefix}.manage`)
+      );
+    });
   }
 
-  public getSummary(): WorkTodaySummary {
-    const activeItems = this.items.filter((item) => !item.completed);
+  public async getSummary(userPermissions?: string[]): Promise<WorkTodaySummary> {
+    if (!environment.isMockMode) {
+      try {
+        const res = await apiRequest<WorkTodaySummary>('/api/v1/work-today/summary/');
+        return res;
+      } catch (e) {
+        console.warn('Backend work-today summary unavailable, falling back to local service');
+      }
+    }
+
+    const authorized = this.filterAuthorized(this.items, userPermissions);
+    const activeItems = authorized.filter((item) => !item.completed);
     const criticalCount = activeItems.filter((i) => i.urgency === 'Critical').length;
     const importantCount = activeItems.filter((i) => i.urgency === 'Important').length;
     const normalCount = activeItems.filter((i) => i.urgency === 'Normal').length;
@@ -377,15 +398,11 @@ class WorkTodayService {
       }
     });
 
-    const highPriorityApprovals = activeItems.filter(
-      (i) => i.category === 'Pending Approvals' && i.priority === 'High'
+    const highPriorityCount = activeItems.filter(
+      (i) => i.priority === 'High' || i.urgency === 'Critical'
     ).length;
-    const overdueInvoices = activeItems.filter((i) => i.category === 'Overdue Payments').length;
-    const lowStockCount = activeItems.filter((i) => i.category === 'Low Stock').length;
-    const employeeRequestsCount = activeItems.filter((i) => i.category === 'Employee Requests').length;
-    const pendingPurchasesCount = activeItems.filter((i) => i.category === 'Pending Purchases').length;
 
-    const headlineSummary = `You have ${activeItems.length} items requiring attention today.\n${highPriorityApprovals} high-priority approvals\n${overdueInvoices} overdue invoices\n${lowStockCount} low-stock products\n${employeeRequestsCount} employee requests\n${pendingPurchasesCount} pending purchase order`;
+    const headlineSummary = `Today you have ${activeItems.length} items requiring attention. ${highPriorityCount} are high priority.`;
 
     return {
       totalCount: activeItems.length,
@@ -393,13 +410,34 @@ class WorkTodayService {
       importantCount,
       normalCount,
       categoryCounts: categoryCounts as any,
-      greeting: 'Good morning.',
+      greeting: 'Today',
       headlineSummary,
     };
   }
 
-  public getFilteredItems(filter: WorkFilter, sortByUrgency: boolean = false): WorkItem[] {
-    let result = this.items.filter((item) => !item.completed);
+  public async getFilteredItems(
+    filter: WorkFilter,
+    sortByUrgency: boolean = false,
+    userPermissions?: string[]
+  ): Promise<WorkItem[]> {
+    if (!environment.isMockMode) {
+      try {
+        const queryParams = new URLSearchParams({
+          filter,
+          ai_prioritized: String(sortByUrgency),
+        });
+        const res = await apiRequest<WorkItem[]>(`/api/v1/work-today/items/?${queryParams}`);
+        return res;
+      } catch (e) {
+        console.warn('Backend work-today items API unavailable, falling back to local service');
+      }
+    }
+
+    // Simulated short network delay for realistic loading states
+    await new Promise((r) => setTimeout(r, 120));
+
+    const authorized = this.filterAuthorized(this.items, userPermissions);
+    let result = authorized.filter((item) => !item.completed);
 
     switch (filter) {
       case 'High Priority':
@@ -444,7 +482,6 @@ class WorkTodayService {
 
     if (sortByUrgency) {
       result.sort((a, b) => {
-        // AI Urgency Rank: 1 is top priority
         const rankA = a.aiPriorityRank ?? 99;
         const rankB = b.aiPriorityRank ?? 99;
         return rankA - rankB;
@@ -454,14 +491,32 @@ class WorkTodayService {
     return result;
   }
 
-  public completeItem(id: string): WorkItem | null {
-    const item = this.items.find((i) => i.id === id);
-    if (item) {
-      item.completed = true;
-      this.notify();
-      return item;
+  public async executeAction(req: WorkItemActionRequest): Promise<WorkItemActionResponse> {
+    if (!environment.isMockMode) {
+      return apiRequest<WorkItemActionResponse>(`/api/v1/work-today/items/${req.itemId}/execute-action/`, {
+        method: 'POST',
+        body: JSON.stringify(req),
+      });
     }
-    return null;
+
+    // Local simulation
+    const item = this.items.find((i) => i.id === req.itemId);
+    if (!item) {
+      throw new Error(`Work item ${req.itemId} not found.`);
+    }
+
+    item.completed = true;
+    this.notify();
+
+    return {
+      success: true,
+      itemId: req.itemId,
+      actionExecuted: req.actionType,
+      updatedStatus: 'Processed',
+      transactionRef: `TX-${Math.floor(100000 + Math.random() * 900000)}`,
+      message: `Successfully executed ${req.actionType} on ${item.title}`,
+      auditLogId: `AUD-${Date.now()}`,
+    };
   }
 
   public undoComplete(id: string): void {
