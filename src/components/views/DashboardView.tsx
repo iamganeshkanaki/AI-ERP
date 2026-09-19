@@ -15,6 +15,7 @@ import {
   BarChart2,
 } from 'lucide-react';
 import { KPICard } from '../common/KPICard';
+import { MyWorkTodaySection } from '../dashboard/MyWorkTodaySection';
 import { DashboardKPIs, AIInsight } from '../../types/erp';
 import { erpDataService } from '../../services/erpDataService';
 import { useAuth } from '../../context/AuthContext';
@@ -193,75 +194,98 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         ))}
       </div>
 
-      {/* 3. KPI Cards Grid (8 core metrics) */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KPICard
-          title="Sales Today"
-          value={kpis?.salesToday || 428500}
-          growth={kpis?.salesGrowth || 14.8}
-          currency
-          subtext="vs previous day"
-          icon={<TrendingUp className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />}
-          onClick={() => onNavigate('/sales')}
-        />
-        <KPICard
-          title="Purchases (Month)"
-          value={kpis?.purchasesThisMonth || 1250000}
-          growth={kpis?.purchasesGrowth || -4.2}
-          currency
-          subtext="vs last month"
-          icon={<ShoppingCart className="h-5 w-5 text-sky-600 dark:text-sky-400" />}
-          onClick={() => onNavigate('/purchase')}
-        />
-        <KPICard
-          title="Total Gross Revenue"
-          value={kpis?.revenue || 8940000}
-          growth={kpis?.revenueGrowth || 18.5}
-          currency
-          subtext="YTD Q3"
-          icon={<DollarSign className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />}
-          onClick={() => onNavigate('/reports')}
-        />
-        <KPICard
-          title="Operating Expenses"
-          value={kpis?.expenses || 3120000}
-          growth={kpis?.expensesGrowth || 2.1}
-          currency
-          subtext="89% of budget"
-          icon={<Receipt className="h-5 w-5 text-amber-600 dark:text-amber-400" />}
-          onClick={() => onNavigate('/finance')}
-        />
-        <KPICard
-          title="Receivables"
-          value={kpis?.receivables || 1840000}
-          currency
-          subtext="₹4.6L overdue"
-          icon={<ArrowDownLeft className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />}
-          onClick={() => onOpenAI('Show overdue invoices')}
-        />
-        <KPICard
-          title="Payables"
-          value={kpis?.payables || 920000}
-          currency
-          subtext="Net 30 terms"
-          icon={<ArrowUpRight className="h-5 w-5 text-rose-600 dark:text-rose-400" />}
-          onClick={() => onNavigate('/purchase')}
-        />
-        <KPICard
-          title="Inventory Value"
-          value={kpis?.inventoryValue || 14650000}
-          currency
-          subtext="7 low-stock alerts"
-          icon={<Package className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />}
-          onClick={() => onNavigate('/inventory')}
-        />
-        <KPICard
-          title="Pending Approvals"
-          value={kpis?.pendingApprovalsCount || 5}
-          subtext="Requires sign-off"
-          icon={<CheckCircle2 className="h-5 w-5 text-rose-600 dark:text-rose-400" />}
-          onClick={() => onNavigate('/approvals')}
-        />
+      {/* 3. "My Work Today" Executive Dashboard Section */}
+      <MyWorkTodaySection
+        onOpenAI={onOpenAI}
+        onNavigate={onNavigate}
+        onOpenQuickCreate={onOpenQuickCreate}
+      />
+
+      {/* 4. Enterprise Performance & Operational KPI Grid */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider text-xs">
+            Operational Metrics &amp; Ledger Performance
+          </h3>
+          <span className="text-xs text-slate-400">Real-time sync across ERP modules</span>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <KPICard
+            title="Sales Today"
+            value={kpis?.salesToday || 428500}
+            growth={kpis?.salesGrowth || 14.8}
+            currency
+            subtext="Sales are 14.8% higher than last month"
+            actionText="View Sales Ledger"
+            icon={<TrendingUp className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />}
+            onClick={() => onNavigate('/sales')}
+          />
+          <KPICard
+            title="Inventory Value"
+            value={kpis?.inventoryValue || 14650000}
+            currency
+            subtext="7 products require reorder"
+            actionText="Inspect Low Stock"
+            icon={<Package className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />}
+            onClick={() => onNavigate('/inventory')}
+          />
+          <KPICard
+            title="Receivables"
+            value={kpis?.receivables || 1840000}
+            currency
+            subtext="3 invoices are overdue (₹4.6L)"
+            actionText="Review Overdue Invoices"
+            icon={<ArrowDownLeft className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />}
+            onClick={() => onOpenAI('Show overdue invoices')}
+          />
+          <KPICard
+            title="Pending Approvals"
+            value={kpis?.pendingApprovalsCount || 5}
+            subtext="5 requests require sign-off today"
+            actionText="Open Approval Center"
+            icon={<CheckCircle2 className="h-5 w-5 text-rose-600 dark:text-rose-400" />}
+            onClick={() => onNavigate('/approvals')}
+          />
+          <KPICard
+            title="Purchases (Month)"
+            value={kpis?.purchasesThisMonth || 1250000}
+            growth={kpis?.purchasesGrowth || -4.2}
+            currency
+            subtext="Spend is 4.2% below quarterly cap"
+            actionText="Manage Procurement"
+            icon={<ShoppingCart className="h-5 w-5 text-sky-600 dark:text-sky-400" />}
+            onClick={() => onNavigate('/purchase')}
+          />
+          <KPICard
+            title="Total Gross Revenue"
+            value={kpis?.revenue || 8940000}
+            growth={kpis?.revenueGrowth || 18.5}
+            currency
+            subtext="Ahead of Q3 revenue target by 18.5%"
+            actionText="Open Financial Report"
+            icon={<DollarSign className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />}
+            onClick={() => onNavigate('/reports')}
+          />
+          <KPICard
+            title="Operating Expenses"
+            value={kpis?.expenses || 3120000}
+            growth={kpis?.expensesGrowth || 2.1}
+            currency
+            subtext="89% of monthly operating budget used"
+            actionText="Audit Expense Ledger"
+            icon={<Receipt className="h-5 w-5 text-amber-600 dark:text-amber-400" />}
+            onClick={() => onNavigate('/finance')}
+          />
+          <KPICard
+            title="Payables"
+            value={kpis?.payables || 920000}
+            currency
+            subtext="₹2.8L due this week under Net 30"
+            actionText="Review Vendor Vouchers"
+            icon={<ArrowUpRight className="h-5 w-5 text-rose-600 dark:text-rose-400" />}
+            onClick={() => onNavigate('/purchase')}
+          />
+        </div>
       </div>
 
       {/* 4. AI Insights Section */}

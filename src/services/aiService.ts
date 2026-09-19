@@ -27,6 +27,64 @@ export const aiService = {
     await new Promise((r) => setTimeout(r, 650));
     const query = request.message.toLowerCase();
 
+    // 0. "What should I take care of today?" / "My work today" / AI Prioritization
+    if (
+      query.includes('take care of today') ||
+      query.includes('work today') ||
+      query.includes('handle first') ||
+      query.includes('priorit') ||
+      query.includes('what should i do') ||
+      query.includes('morning brief')
+    ) {
+      return {
+        id: `ai-${Date.now()}`,
+        sender: 'assistant',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        text: `Good morning. You have 12 items requiring attention today (2 critical, 5 important, 5 normal).\n\nHere are the 3 highest-urgency items you should handle first based on cashflow risk and supply continuity:`,
+        responseType: 'table',
+        tableData: {
+          title: 'Top Priority Items for Today',
+          columns: [
+            { key: 'rank', label: 'Priority', align: 'center' },
+            { key: 'action', label: 'Action Item', align: 'left' },
+            { key: 'category', label: 'Category', align: 'left' },
+            { key: 'value', label: 'Impact / Value', align: 'right' },
+            { key: 'urgency', label: 'Why Handle First', align: 'left' },
+          ],
+          rows: [
+            {
+              rank: '🔴 #1',
+              action: 'Approve ₹1.25L purchase order from ABC Traders (PO-2026-4401)',
+              category: 'Pending Approval',
+              value: '₹1,25,000',
+              urgency: 'Prevents robotics line stockout tomorrow',
+            },
+            {
+              rank: '🔴 #2',
+              action: 'Follow up on ₹85K overdue invoice from ABC Pvt Ltd (INV-1023)',
+              category: 'Overdue Payment',
+              value: '₹85,000',
+              urgency: '12 days overdue; credit limit exceeded',
+            },
+            {
+              rank: '🟠 #3',
+              action: 'Reorder Printer Cartridge because stock (12) is below safety level (25)',
+              category: 'Low Stock',
+              value: '12 Units Left',
+              urgency: 'Warehouse shipping label dispatch at risk',
+            },
+          ],
+          totalSummary: 'Tap any action below to execute immediately without navigating through separate modules.',
+        },
+        quickActions: [
+          { label: '1. Approve ABC Traders PO (₹1.25L)', prompt: 'Approve purchase order PO-2026-4401' },
+          { label: '2. Remind ABC Pvt Ltd (₹85K)', prompt: 'Send reminder for invoice INV-1023' },
+          { label: '3. Reorder Printer Cartridge', prompt: 'Create purchase order for low stock items' },
+          { label: 'View All 12 Work Items', prompt: 'Show pending approvals' },
+        ],
+      };
+    }
+
     // 1. Purchase order confirmation
     if (query.includes('purchase order') || query.includes('po') || query.includes('abc traders')) {
       return {
