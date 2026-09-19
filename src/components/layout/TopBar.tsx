@@ -25,6 +25,7 @@ interface TopBarProps {
   onOpenAI: (initialPrompt?: string) => void;
   onOpenQuickCreate: (type: string) => void;
   onOpenUpload: () => void;
+  onOpenGlobalSearch?: () => void;
   onNavigate?: (path: string) => void;
   notifications: Notification[];
   onMarkAllNotificationsRead: () => void;
@@ -45,6 +46,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenAI,
   onOpenQuickCreate,
   onOpenUpload,
+  onOpenGlobalSearch,
   onNavigate,
   notifications,
   onMarkAllNotificationsRead,
@@ -70,15 +72,30 @@ export const TopBar: React.FC<TopBarProps> = ({
 
   return (
     <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-slate-200 bg-white/95 px-4 sm:px-6 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/95">
-      {/* Left: AI Prompt Omnibar */}
-      <div className="flex flex-1 items-center max-w-xl">
-        <form onSubmit={handleSearchSubmit} className="relative w-full">
+      {/* Left: AI Prompt Omnibar & Global Search Trigger */}
+      <div className="flex flex-1 items-center max-w-xl gap-2">
+        {onOpenGlobalSearch && (
+          <button
+            type="button"
+            onClick={onOpenGlobalSearch}
+            className="hidden sm:inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/90 px-3 py-2 text-xs text-slate-500 hover:border-slate-300 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-400 dark:hover:bg-slate-800"
+            title="Global ERP Search (⌘K)"
+          >
+            <Search className="h-3.5 w-3.5 text-slate-400" />
+            <span className="hidden md:inline">Quick Search...</span>
+            <kbd className="hidden lg:inline-block rounded bg-white px-1.5 py-0.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-900 font-mono text-[10px]">
+              ⌘K
+            </kbd>
+          </button>
+        )}
+
+        <form onSubmit={handleSearchSubmit} className="relative flex-1">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
           <input
             type="text"
             value={topSearch}
             onChange={(e) => setTopSearch(e.target.value)}
-            placeholder='Ask your ERP anything... ("Show today sales", "Low stock SKUs")'
+            placeholder='Ask AI anything... ("Show today sales", "Low stock SKUs")'
             className="w-full rounded-xl border border-slate-200 bg-slate-50/75 py-2 pl-9 pr-10 text-xs text-slate-900 placeholder:text-slate-400 transition-colors focus:border-indigo-500 focus:bg-white focus:outline-none dark:border-slate-700 dark:bg-slate-800/60 dark:text-white dark:focus:border-indigo-400"
           />
           <button

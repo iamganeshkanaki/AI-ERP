@@ -393,3 +393,67 @@ export const mockSalesChartData = [
   { month: 'Aug', sales: 490000, purchases: 280000, profit: 210000 },
   { month: 'Sep', sales: 580000, purchases: 340000, profit: 240000 },
 ];
+
+export const mockInvoices: Invoice[] = [
+  {
+    id: 'inv-101',
+    invoiceNumber: 'INV-2026-7712',
+    partyName: 'Zenith Marine Works',
+    type: 'Sales',
+    issueDate: '2026-08-15',
+    dueDate: '2026-09-14',
+    amount: 420000,
+    taxAmount: 75600,
+    status: 'Overdue',
+  },
+  {
+    id: 'inv-102',
+    invoiceNumber: 'INV-2026-7713',
+    partyName: 'Orion Advanced Robotics',
+    type: 'Sales',
+    issueDate: '2026-09-10',
+    dueDate: '2026-10-10',
+    amount: 185000,
+    taxAmount: 33300,
+    status: 'Paid',
+  },
+  {
+    id: 'inv-103',
+    invoiceNumber: 'INV-2026-7714',
+    partyName: 'Apex Industrial Automation Ltd',
+    type: 'Sales',
+    issueDate: '2026-09-18',
+    dueDate: '2026-10-18',
+    amount: 320000,
+    taxAmount: 57600,
+    status: 'Unpaid',
+  },
+  {
+    id: 'inv-104',
+    invoiceNumber: 'PINV-2026-4401',
+    partyName: 'ABC Traders & Supplies',
+    type: 'Purchase',
+    issueDate: '2026-09-19',
+    dueDate: '2026-10-19',
+    amount: 120000,
+    taxAmount: 21600,
+    status: 'Unpaid',
+  },
+];
+
+export interface EmployeeRecord {
+  id: string;
+  name: string;
+  role: string;
+  dept: string;
+  status: string;
+  email: string;
+}
+
+export const mockEmployees: EmployeeRecord[] = [
+  { id: 'EMP-101', name: 'Ganesh Kanaki', role: 'Head of Operations / ERP Admin', dept: 'Executive', status: 'Active', email: 'ganesh@apexglobals.com' },
+  { id: 'EMP-102', name: 'Priya Sharma', role: 'Finance Controller', dept: 'Finance', status: 'Active', email: 'priya.s@apexglobals.com' },
+  { id: 'EMP-103', name: 'Rajesh Nair', role: 'Supply Chain & Procurement Lead', dept: 'Procurement', status: 'Active', email: 'rajesh.n@apexglobals.com' },
+  { id: 'EMP-104', name: 'Anita Desai', role: 'Inventory Officer', dept: 'Warehouse', status: 'Active', email: 'anita.d@apexglobals.com' },
+  { id: 'EMP-105', name: 'Vikram Mehta', role: 'Enterprise Account Executive', dept: 'Sales', status: 'Active', email: 'vikram.m@apexglobals.com' },
+];

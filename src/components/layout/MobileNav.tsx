@@ -14,6 +14,11 @@ import {
   FileText,
   Settings,
   BarChart3,
+  Briefcase,
+  Wrench,
+  LifeBuoy,
+  Bell,
+  ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -39,16 +44,22 @@ export const MobileNav: React.FC<MobileNavProps> = ({
   };
 
   const navLinks = [
-    { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { label: 'Reports & Query', path: '/reports', icon: BarChart3 },
-    { label: 'Inventory', path: '/inventory', icon: Package, roles: ['Admin', 'Manager', 'Inventory', 'Purchase'] },
-    { label: 'Sales & CRM', path: '/sales', icon: TrendingUp, roles: ['Admin', 'Manager', 'Sales', 'Finance'] },
-    { label: 'Purchase', path: '/purchase', icon: ShoppingCart, roles: ['Admin', 'Manager', 'Purchase', 'Finance'] },
-    { label: 'Finance', path: '/finance', icon: DollarSign, roles: ['Admin', 'Manager', 'Finance'] },
+    { label: 'Dashboard & Actions', path: '/dashboard', icon: LayoutDashboard },
+    { label: 'Notifications', path: '/notifications', icon: Bell },
+    { label: 'CRM & Pipeline', path: '/crm', icon: Users, roles: ['Admin', 'Manager', 'Sales'] },
+    { label: 'Sales Orders', path: '/sales', icon: TrendingUp, roles: ['Admin', 'Manager', 'Sales', 'Finance'] },
+    { label: 'Purchase & POs', path: '/purchase', icon: ShoppingCart, roles: ['Admin', 'Manager', 'Purchase', 'Finance'] },
+    { label: 'Inventory & Stock', path: '/inventory', icon: Package, roles: ['Admin', 'Manager', 'Inventory', 'Purchase'] },
+    { label: 'Projects & Milestones', path: '/projects', icon: Briefcase, roles: ['Admin', 'Manager', 'Employee'] },
+    { label: 'Fixed Assets & Plant', path: '/assets', icon: Wrench, roles: ['Admin', 'Manager', 'Inventory'] },
+    { label: 'Service & Helpdesk', path: '/service', icon: LifeBuoy, roles: ['Admin', 'Manager', 'Employee', 'Sales'] },
+    { label: 'Finance & Ledger', path: '/finance', icon: DollarSign, roles: ['Admin', 'Manager', 'Finance'] },
     { label: 'HR Personnel', path: '/hr', icon: Users, roles: ['Admin', 'Manager', 'HR'] },
-    { label: 'Approvals', path: '/approvals', icon: CheckCircle2, roles: ['Admin', 'Manager', 'Finance', 'Purchase', 'HR'] },
+    { label: 'Approval Center', path: '/approvals', icon: CheckCircle2, roles: ['Admin', 'Manager', 'Finance', 'Purchase', 'HR'] },
+    { label: 'Reports & Query', path: '/reports', icon: BarChart3 },
+    { label: 'Audit Trail (SOC2)', path: '/audit-logs', icon: ShieldCheck, roles: ['Admin', 'Manager'] },
     { label: 'Document OCR', path: '/documents', icon: FileText },
-    { label: 'Settings & DRF', path: '/settings', icon: Settings },
+    { label: 'Settings & n8n', path: '/settings', icon: Settings },
   ];
 
   return (

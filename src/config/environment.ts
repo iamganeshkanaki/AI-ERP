@@ -50,6 +50,11 @@ export interface AppEnvironment {
       list: string;
       markRead: string;
     };
+    n8n: {
+      webhook: string;
+      webhookUrl: string;
+      triggers: string;
+    };
   };
 }
 
@@ -142,6 +147,11 @@ export const environment: AppEnvironment = {
     notifications: {
       list: '/notifications/',
       markRead: '/notifications/mark-read/',
+    },
+    n8n: {
+      webhook: '/webhooks/n8n/',
+      webhookUrl: '/webhooks/n8n/',
+      triggers: '/webhooks/triggers/',
     },
   },
 };

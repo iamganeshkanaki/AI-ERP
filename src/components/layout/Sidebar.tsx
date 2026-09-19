@@ -13,6 +13,11 @@ import {
   Settings,
   ChevronRight,
   Shield,
+  Bell,
+  Briefcase,
+  Wrench,
+  LifeBuoy,
+  ShieldCheck,
 } from 'lucide-react';
 import { navigationGroups, NavItem } from '../../config/navigation';
 import { useAuth } from '../../context/AuthContext';
@@ -37,6 +42,11 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   FileText: <FileText className="h-4 w-4" />,
   BarChart3: <BarChart3 className="h-4 w-4" />,
   Settings: <Settings className="h-4 w-4" />,
+  Bell: <Bell className="h-4 w-4" />,
+  Briefcase: <Briefcase className="h-4 w-4" />,
+  Wrench: <Wrench className="h-4 w-4" />,
+  LifeBuoy: <LifeBuoy className="h-4 w-4" />,
+  ShieldCheck: <ShieldCheck className="h-4 w-4" />,
 };
 
 export const Sidebar: React.FC<SidebarProps> = ({

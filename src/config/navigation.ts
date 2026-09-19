@@ -26,13 +26,13 @@ export const navigationGroups: NavGroup[] = [
     items: [
       {
         id: 'dashboard',
-        label: 'Dashboard',
+        label: 'Dashboard & Action Center',
         path: '/dashboard',
         iconName: 'LayoutDashboard',
       },
       {
         id: 'ai-assistant',
-        label: 'AI ERP Assistant',
+        label: 'AI ERP Copilot',
         path: '/ai-assistant',
         iconName: 'Bot',
         badge: 'Smart',
@@ -45,14 +45,28 @@ export const navigationGroups: NavGroup[] = [
         badge: 5,
         roles: ['Admin', 'Manager', 'Finance', 'Purchase', 'HR'],
       },
+      {
+        id: 'notifications',
+        label: 'Notifications',
+        path: '/notifications',
+        iconName: 'Bell',
+        roles: ['Admin', 'Manager', 'Finance', 'Purchase', 'Sales', 'Inventory', 'HR', 'Employee'],
+      },
     ],
   },
   {
     groupName: 'Operations',
     items: [
       {
+        id: 'crm',
+        label: 'CRM & Pipeline',
+        path: '/crm',
+        iconName: 'Users',
+        roles: ['Admin', 'Manager', 'Sales'],
+      },
+      {
         id: 'sales',
-        label: 'Sales & CRM',
+        label: 'Sales & Orders',
         path: '/sales',
         iconName: 'TrendingUp',
         roles: ['Admin', 'Manager', 'Sales', 'Finance'],
@@ -87,10 +101,31 @@ export const navigationGroups: NavGroup[] = [
           { id: 'adjustments', label: 'Stock Adjustments', path: '/inventory/adjustments' },
         ],
       },
+      {
+        id: 'projects',
+        label: 'Projects & Milestones',
+        path: '/projects',
+        iconName: 'Briefcase',
+        roles: ['Admin', 'Manager', 'Employee'],
+      },
+      {
+        id: 'assets',
+        label: 'Fixed Assets & Plant',
+        path: '/assets',
+        iconName: 'Wrench',
+        roles: ['Admin', 'Manager', 'Inventory'],
+      },
+      {
+        id: 'service',
+        label: 'Service & Helpdesk',
+        path: '/service',
+        iconName: 'LifeBuoy',
+        roles: ['Admin', 'Manager', 'Employee', 'Sales'],
+      },
     ],
   },
   {
-    groupName: 'Management',
+    groupName: 'Management & Governance',
     items: [
       {
         id: 'finance',
@@ -125,14 +160,22 @@ export const navigationGroups: NavGroup[] = [
       },
       {
         id: 'reports',
-        label: 'Reports & Query Builder',
+        label: 'Reports & BI',
         path: '/reports',
         iconName: 'BarChart3',
-        badge: 'Query/Export',
+        badge: 'Query',
+      },
+      {
+        id: 'audit-logs',
+        label: 'Audit Trail',
+        path: '/audit-logs',
+        iconName: 'ShieldCheck',
+        badge: 'SOC2',
+        roles: ['Admin', 'Manager'],
       },
       {
         id: 'settings',
-        label: 'System & API Config',
+        label: 'Settings & n8n',
         path: '/settings',
         iconName: 'Settings',
       },

@@ -7,6 +7,7 @@ import { MobileNav } from './components/layout/MobileNav';
 import { AIAssistantModal } from './components/ai/AIAssistantModal';
 import { DocumentUploadModal } from './components/common/DocumentUploadModal';
 import { DynamicFormModal, FormFieldConfig } from './components/common/DynamicFormModal';
+import { GlobalSearchModal } from './components/common/GlobalSearchModal';
 import { DashboardView } from './components/views/DashboardView';
 import { InventoryView } from './components/views/InventoryView';
 import { SalesView } from './components/views/SalesView';
@@ -18,6 +19,12 @@ import { ReportsView } from './components/views/ReportsView';
 import { DocumentsView } from './components/views/DocumentsView';
 import { SettingsView } from './components/views/SettingsView';
 import { LoginView } from './components/views/LoginView';
+import { CRMView } from './components/views/CRMView';
+import { ProjectsView } from './components/views/ProjectsView';
+import { AssetsView } from './components/views/AssetsView';
+import { ServiceView } from './components/views/ServiceView';
+import { AuditLogsView } from './components/views/AuditLogsView';
+import { NotificationsView } from './components/views/NotificationsView';
 import { mockNotifications } from './services/mockData';
 import { erpDataService } from './services/erpDataService';
 import { Notification } from './types/erp';
@@ -29,7 +36,20 @@ function MainAppShell() {
   const [isAIOpen, setIsAIOpen] = useState<boolean>(false);
   const [aiInitialPrompt, setAiInitialPrompt] = useState<string | undefined>();
   const [isUploadOpen, setIsUploadOpen] = useState<boolean>(false);
+  const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState<boolean>(false);
   const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
+
+  // Global Keyboard Shortcut for Search (Cmd+K / Ctrl+K)
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsGlobalSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Dynamic Form Modal State
   const [formModalState, setFormModalState] = useState<{
@@ -245,6 +265,38 @@ function MainAppShell() {
             onAskAI={(p) => handleOpenAI(p)}
           />
         );
+      case '/crm':
+        return (
+          <CRMView
+            onOpenQuickCreate={handleOpenQuickCreate}
+            onAskAI={(p) => handleOpenAI(p)}
+          />
+        );
+      case '/projects':
+        return (
+          <ProjectsView
+            onOpenQuickCreate={handleOpenQuickCreate}
+            onAskAI={(p) => handleOpenAI(p)}
+          />
+        );
+      case '/assets':
+        return (
+          <AssetsView
+            onOpenQuickCreate={handleOpenQuickCreate}
+            onAskAI={(p) => handleOpenAI(p)}
+          />
+        );
+      case '/service':
+        return (
+          <ServiceView
+            onOpenQuickCreate={handleOpenQuickCreate}
+            onAskAI={(p) => handleOpenAI(p)}
+          />
+        );
+      case '/audit-logs':
+        return <AuditLogsView />;
+      case '/notifications':
+        return <NotificationsView onNavigate={(p) => setCurrentPath(p)} />;
       case '/settings':
         return <SettingsView />;
       case '/dashboard':
@@ -276,6 +328,7 @@ function MainAppShell() {
           onOpenAI={handleOpenAI}
           onOpenQuickCreate={handleOpenQuickCreate}
           onOpenUpload={() => setIsUploadOpen(true)}
+          onOpenGlobalSearch={() => setIsGlobalSearchOpen(true)}
           onNavigate={(path) => setCurrentPath(path)}
           notifications={notifications}
           onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
@@ -296,6 +349,13 @@ function MainAppShell() {
           onOpenQuickCreate={() => handleOpenQuickCreate('sale')}
         />
       </div>
+
+      {/* Global Search Modal (Cmd+K) */}
+      <GlobalSearchModal
+        isOpen={isGlobalSearchOpen}
+        onClose={() => setIsGlobalSearchOpen(false)}
+        onNavigate={(path) => setCurrentPath(path)}
+      />
 
       {/* Global AI Assistant Modal */}
       <AIAssistantModal
