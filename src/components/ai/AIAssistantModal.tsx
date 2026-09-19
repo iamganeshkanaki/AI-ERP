@@ -13,10 +13,13 @@ import {
   Sparkles,
   Maximize2,
   Minimize2,
+  AlertCircle,
 } from 'lucide-react';
 import { AIChatMessage } from '../../types/ai';
 import { aiService } from '../../services/aiService';
 import { AIActionConfirmationCard } from './AIActionConfirmationCard';
+import { useSpeechRecognition } from '../../utils/useSpeechRecognition';
+import { useAuth } from '../../context/AuthContext';
 import {
   ResponsiveContainer,
   BarChart,
@@ -61,13 +64,24 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
       ],
     },
   ]);
+  const { user } = useAuth();
   const [inputText, setInputText] = useState(initialPrompt || '');
   const [isTyping, setIsTyping] = useState(false);
-  const [isListening, setIsListening] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; size: string; type: string }[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const {
+    isListening,
+    transcript,
+    errorMessage: voiceError,
+    startListening,
+    stopListening,
+    clearError: clearVoiceError,
+  } = useSpeechRecognition((liveTranscript) => {
+    setInputText(liveTranscript);
+  });
 
   useEffect(() => {
     if (initialPrompt && isOpen) {
@@ -82,6 +96,10 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
   if (!isOpen) return null;
 
   const handleSend = async (textToSend?: string) => {
+    if (isListening) {
+      stopListening();
+    }
+
     const query = (textToSend || inputText).trim();
     if (!query && attachedFiles.length === 0) return;
 
@@ -102,6 +120,9 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
       const aiResponse = await aiService.sendMessage({
         message: query,
         conversation_id: 'conv-session-1',
+        context: {
+          activeRole: user?.role || 'Admin',
+        },
       });
       setMessages((prev) => [...prev, aiResponse]);
     } catch (err: any) {
@@ -120,41 +141,22 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
     }
   };
 
-  const handleVoiceToggle = () => {
+  const handleDoneSpeaking = () => {
+    stopListening();
+    const query = (inputText.trim() || transcript.trim() || "Show today's sales").trim();
+    // Auto paste message into input box
+    setInputText(query);
+    // Submit message and return output immediately
+    handleSend(query);
+  };
+
+  const handleVoiceToggle = async () => {
     if (isListening) {
-      setIsListening(false);
-      return;
-    }
-
-    // Check for speech recognition
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      try {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = false;
-        recognition.interimResults = false;
-        recognition.lang = 'en-US';
-
-        recognition.onstart = () => setIsListening(true);
-        recognition.onresult = (event: any) => {
-          const transcript = event.results[0][0].transcript;
-          setInputText(transcript);
-          setIsListening(false);
-        };
-        recognition.onerror = () => setIsListening(false);
-        recognition.onend = () => setIsListening(false);
-
-        recognition.start();
-      } catch {
-        setIsListening(false);
-      }
+      handleDoneSpeaking();
     } else {
-      // Fallback simulated voice listening
-      setIsListening(true);
-      setTimeout(() => {
-        setInputText("Show today's sales");
-        setIsListening(false);
-      }, 1600);
+      await startListening(inputText, (liveText) => {
+        setInputText(liveText);
+      });
     }
   };
 
@@ -436,6 +438,46 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
 
         {/* Input Dock */}
         <div className="border-t border-slate-200 bg-white p-3 sm:p-4 dark:border-slate-800 dark:bg-slate-900">
+          {/* Voice Recognition Error Alert */}
+          {voiceError && (
+            <div className="mb-2.5 flex items-center justify-between rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-800 border border-rose-200 dark:bg-rose-950/50 dark:border-rose-900/60 dark:text-rose-300">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 text-rose-500" />
+                <span>{voiceError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={clearVoiceError}
+                className="text-rose-400 hover:text-rose-600 dark:hover:text-rose-200"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Active Voice Recording Indicator */}
+          {isListening && (
+            <div className="mb-2.5 flex items-center justify-between rounded-lg bg-rose-50/90 px-3.5 py-2 text-xs text-rose-800 border border-rose-200 shadow-2xs dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
+              <div className="flex items-center gap-2.5">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-600"></span>
+                </span>
+                <span className="font-semibold">Listening to voice... (Speak clearly into your microphone)</span>
+              </div>
+              <button
+                type="button"
+                id="btn-done-speaking"
+                onClick={handleDoneSpeaking}
+                className="flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-1 text-xs font-semibold text-white shadow-xs hover:bg-rose-700 active:scale-95 transition-all"
+                title="Done speaking - auto paste message and return output"
+              >
+                <Send className="h-3 w-3" />
+                <span>Done Speaking</span>
+              </button>
+            </div>
+          )}
+
           {/* File Attachment Pill Preview */}
           {attachedFiles.length > 0 && (
             <div className="mb-2 flex items-center gap-2 rounded-lg bg-slate-100 p-2 text-xs dark:bg-slate-800">

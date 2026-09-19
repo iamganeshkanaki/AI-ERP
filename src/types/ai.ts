@@ -15,13 +15,22 @@ export type AIActionStatus =
   | 'failed';
 
 export interface AIActionPayload {
-  actionType: 'create_po' | 'create_invoice' | 'approve_request' | 'create_expense' | 'adjust_stock';
+  actionType:
+    | 'create_po'
+    | 'create_invoice'
+    | 'approve_request'
+    | 'create_expense'
+    | 'adjust_stock'
+    | 'create_sale'
+    | 'create_payment'
+    | 'delete_invoice';
   title: string;
   summary: string;
   details: Record<string, any>;
   status: AIActionStatus;
   resultId?: string;
   errorMessage?: string;
+  idempotencyKey?: string;
 }
 
 export interface TableResponseData {

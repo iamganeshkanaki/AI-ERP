@@ -1,0 +1,1 @@
+"""Finance and accounting package."""

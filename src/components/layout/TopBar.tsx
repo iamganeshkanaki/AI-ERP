@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   Search,
   Mic,
+  MicOff,
   Bell,
   Plus,
   Sun,
@@ -14,12 +15,15 @@ import {
   Server,
   Upload,
   BarChart3,
+  AlertCircle,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { UserRole } from '../../types/auth';
 import { Notification } from '../../types/erp';
 import { environment } from '../../config/environment';
+import { useSpeechRecognition } from '../../utils/useSpeechRecognition';
 
 interface TopBarProps {
   onOpenAI: (initialPrompt?: string) => void;
@@ -58,10 +62,41 @@ export const TopBar: React.FC<TopBarProps> = ({
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [topSearch, setTopSearch] = useState('');
 
+  const {
+    isListening: isTopMicListening,
+    errorMessage: topMicError,
+    startListening: startTopMic,
+    stopListening: stopTopMic,
+    clearError: clearTopMicError,
+  } = useSpeechRecognition((liveTranscript) => {
+    setTopSearch(liveTranscript);
+  });
+
   const unreadCount = notifications.filter((n) => !n.read).length;
+
+  const handleTopDoneSpeaking = () => {
+    stopTopMic();
+    const message = (topSearch.trim() || "Show today's sales").trim();
+    setTopSearch(message);
+    onOpenAI(message);
+    setTopSearch('');
+  };
+
+  const handleTopMicToggle = async () => {
+    if (isTopMicListening) {
+      handleTopDoneSpeaking();
+    } else {
+      await startTopMic(topSearch, (text) => {
+        setTopSearch(text);
+      });
+    }
+  };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isTopMicListening) {
+      stopTopMic();
+    }
     if (topSearch.trim()) {
       onOpenAI(topSearch);
       setTopSearch('');
@@ -95,17 +130,54 @@ export const TopBar: React.FC<TopBarProps> = ({
             type="text"
             value={topSearch}
             onChange={(e) => setTopSearch(e.target.value)}
-            placeholder='Ask AI anything... ("Show today sales", "Low stock SKUs")'
-            className="w-full rounded-xl border border-slate-200 bg-slate-50/75 py-2 pl-9 pr-10 text-xs text-slate-900 placeholder:text-slate-400 transition-colors focus:border-indigo-500 focus:bg-white focus:outline-none dark:border-slate-700 dark:bg-slate-800/60 dark:text-white dark:focus:border-indigo-400"
+            placeholder={
+              isTopMicListening
+                ? 'Listening to voice... (Click mic to stop)'
+                : 'Ask AI anything... ("Show today sales", "Low stock SKUs")'
+            }
+            className={`w-full rounded-xl border py-2 pl-9 ${isTopMicListening ? 'pr-20' : 'pr-10'} text-xs text-slate-900 placeholder:text-slate-400 transition-colors focus:bg-white focus:outline-none dark:text-white ${
+              isTopMicListening
+                ? 'border-rose-500 bg-rose-50/70 ring-1 ring-rose-500 dark:border-rose-500 dark:bg-rose-950/30'
+                : 'border-slate-200 bg-slate-50/75 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:focus:border-indigo-400'
+            }`}
           />
+          {isTopMicListening && (
+            <button
+              type="button"
+              onClick={handleTopDoneSpeaking}
+              id="btn-top-done-speaking"
+              className="absolute right-10 top-1.5 flex h-7 items-center gap-1 rounded-md bg-rose-600 px-2 text-[11px] font-semibold text-white shadow-xs hover:bg-rose-700 active:scale-95 transition-all"
+              title="Done speaking - auto paste and submit to AI"
+            >
+              <span>Done</span>
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => onOpenAI()}
-            className="absolute right-2 top-1.5 flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-200/50 hover:text-indigo-600 dark:hover:bg-slate-700 dark:hover:text-indigo-400"
-            title="Voice / AI Assistant"
+            onClick={handleTopMicToggle}
+            className={`absolute right-2 top-1.5 flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
+              isTopMicListening
+                ? 'bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 animate-pulse'
+                : 'text-slate-400 hover:bg-slate-200/50 hover:text-indigo-600 dark:hover:bg-slate-700 dark:hover:text-indigo-400'
+            }`}
+            title={isTopMicListening ? 'Listening... click to stop' : 'Voice Input (Microphone)'}
           >
-            <Mic className="h-4 w-4" />
+            {isTopMicListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
           </button>
+
+          {topMicError && (
+            <div className="absolute top-12 left-0 z-50 flex items-center gap-1.5 rounded-lg bg-rose-50 px-2.5 py-1 text-[11px] text-rose-800 border border-rose-200 shadow-md dark:bg-rose-950 dark:border-rose-900 dark:text-rose-300">
+              <AlertCircle className="h-3 w-3 text-rose-500" />
+              <span>{topMicError}</span>
+              <button
+                type="button"
+                onClick={clearTopMicError}
+                className="ml-1 text-rose-400 hover:text-rose-600"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          )}
         </form>
       </div>
 
