@@ -1,0 +1,7 @@
+{
+  "name": "AI ERP Platform",
+  "description": "Production-ready, mobile-first AI-powered ERP frontend with Django REST Framework service architecture, responsive tables, and conversational business intelligence.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
